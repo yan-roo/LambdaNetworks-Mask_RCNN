@@ -7,8 +7,7 @@ from mmcv.runner import BaseModule
 from torch.nn.modules.batchnorm import _BatchNorm
 
 from ..builder import BACKBONES
-from ..utils import ResLayer
-from ..utils import LambdaLayer
+from ..utils import LambdaBlock, LambdaLayer
 
 
 class BasicBlock(BaseModule):
@@ -179,7 +178,7 @@ class Bottleneck(BaseModule):
         if self.with_dcn:
             fallback_on_stride = dcn.pop('fallback_on_stride', False)
         if not self.with_dcn or fallback_on_stride:
-            self.conv2 = LambdaLayer(width, m=size, stride=self.conv2_stride)
+            self.conv2 = LambdaBlock(width, m=size, stride=self.conv2_stride)
             # build_conv_layer(
                 # conv_cfg,
                 # planes,
@@ -191,7 +190,7 @@ class Bottleneck(BaseModule):
                 # bias=False)
         else:
             assert self.conv_cfg is None, 'conv_cfg must be None for DCN'
-            self.conv2 = LambdaLayer(width, m=size, stride=self.conv2_stride)
+            self.conv2 = LambdaBlock(width, m=size, stride=self.conv2_stride)
             # build_conv_layer(
                 # dcn,
                 # planes,
@@ -365,8 +364,8 @@ class LambdaResNet(BaseModule):
     """
 
     arch_settings = {
-        26: (BasicBlock, (2, 2, 2, 2)),
-        38: (BasicBlock, (3, 4, 6, 3)),
+        #26: (BasicBlock, (2, 2, 2, 2)),
+        #38: (BasicBlock, (2, 3, 5, 2)),
         50: (Bottleneck, (3, 4, 6, 3)),
         101: (Bottleneck, (3, 4, 23, 3)),
         152: (Bottleneck, (3, 8, 36, 3))
@@ -471,6 +470,7 @@ class LambdaResNet(BaseModule):
                 stage_plugins = self.make_stage_plugins(plugins, i)
             else:
                 stage_plugins = None
+            sizes = [56, 28, 14, 7]
             planes = base_channels * 2**i
             res_layer = self.make_res_layer(
                 block=self.block,
@@ -486,7 +486,8 @@ class LambdaResNet(BaseModule):
                 norm_cfg=norm_cfg,
                 dcn=dcn,
                 plugins=stage_plugins,
-                init_cfg=block_init_cfg)
+                init_cfg=block_init_cfg, 
+                size=sizes[i])
             self.inplanes = planes * self.block.expansion
             layer_name = f'layer{i + 1}'
             self.add_module(layer_name, res_layer)
@@ -561,7 +562,7 @@ class LambdaResNet(BaseModule):
 
     def make_res_layer(self, **kwargs):
         """Pack all blocks in a stage into a ``ResLayer``."""
-        return ResLayer(**kwargs)
+        return LambdaLayer(**kwargs)
 
     @property
     def norm1(self):
